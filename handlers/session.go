@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	"waku/services"
 	"waku/utils"
@@ -49,32 +50,495 @@ func GetQRCode(c *gin.Context) {
 	waService := services.GetWhatsAppService()
 	deviceClient, err := waService.GetSession(deviceID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotFound, "Session not found. Please create session first via POST /session/create")
+		// Check if request is from browser
+		if isBrowserRequest(c) {
+			renderHTMLError(c, "Session not found", "Please create session first via POST /session/create")
+		} else {
+			utils.ErrorResponse(c, http.StatusNotFound, "Session not found. Please create session first via POST /session/create")
+		}
 		return
 	}
 
 	// Check if already connected
 	if deviceClient.Connected {
-		utils.SuccessResponse(c, http.StatusOK, "Already connected", gin.H{
-			"device_id": deviceID,
-			"status":    "connected",
-			"phone":     deviceClient.Phone,
-		})
+		if isBrowserRequest(c) {
+			renderHTMLConnected(c, deviceID, deviceClient.Phone)
+		} else {
+			utils.SuccessResponse(c, http.StatusOK, "Already connected", gin.H{
+				"device_id": deviceID,
+				"status":    "connected",
+				"phone":     deviceClient.Phone,
+			})
+		}
 		return
 	}
 
 	// Wait for QR code with timeout
 	select {
 	case qrCode := <-deviceClient.QRChan:
-		utils.SuccessResponse(c, http.StatusOK, "QR code generated", gin.H{
-			"device_id":  deviceID,
-			"qr_code":    qrCode,
-			"expires_in": 60,
-		})
+		if isBrowserRequest(c) {
+			renderHTMLQRCode(c, deviceID, qrCode)
+		} else {
+			utils.SuccessResponse(c, http.StatusOK, "QR code generated", gin.H{
+				"device_id":  deviceID,
+				"qr_code":    qrCode,
+				"expires_in": 60,
+			})
+		}
 
 	case <-time.After(5 * time.Second):
-		utils.ErrorResponse(c, http.StatusRequestTimeout, "QR code not ready yet. Please try again.")
+		if isBrowserRequest(c) {
+			renderHTMLError(c, "QR code not ready", "Please refresh the page to try again.")
+		} else {
+			utils.ErrorResponse(c, http.StatusRequestTimeout, "QR code not ready yet. Please try again.")
+		}
 	}
+}
+
+// isBrowserRequest checks if the request is from a web browser
+func isBrowserRequest(c *gin.Context) bool {
+	accept := c.GetHeader("Accept")
+	userAgent := c.GetHeader("User-Agent")
+
+	// Check if Accept header contains text/html
+	if strings.Contains(accept, "text/html") {
+		return true
+	}
+
+	// Check common browser user agents
+	browserAgents := []string{"Mozilla", "Chrome", "Safari", "Edge", "Opera", "Firefox"}
+	for _, agent := range browserAgents {
+		if strings.Contains(userAgent, agent) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// renderHTMLQRCode renders HTML page with QR code
+func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
+	html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAKU - WhatsApp QR Code</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .logo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .device-id {
+            background: #f0f0f0;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            font-family: monospace;
+            color: #555;
+        }
+        .qr-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            border: 3px solid #667eea;
+            margin-bottom: 30px;
+            display: inline-block;
+        }
+        #qrcode {
+            margin: 0 auto;
+        }
+        .instructions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .instructions ol {
+            margin-left: 20px;
+            color: #666;
+            line-height: 1.8;
+        }
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #667eea;
+            font-weight: 500;
+            margin-top: 20px;
+        }
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 20px;
+        }
+        .refresh-btn:hover {
+            background: #5568d3;
+        }
+        .footer {
+            margin-top: 30px;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📱</div>
+        <h1>WAKU WhatsApp API</h1>
+        <p class="subtitle">Scan QR Code to Connect</p>
+
+        <div class="device-id">
+            Device ID: <strong>` + deviceID + `</strong>
+        </div>
+
+        <div class="qr-container">
+            <div id="qrcode"></div>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 How to Connect:</h3>
+            <ol>
+                <li>Open <strong>WhatsApp</strong> on your phone</li>
+                <li>Tap <strong>Menu</strong> or <strong>Settings</strong></li>
+                <li>Tap <strong>Linked Devices</strong></li>
+                <li>Tap <strong>Link a Device</strong></li>
+                <li>Point your phone at this screen to scan the QR code</li>
+            </ol>
+        </div>
+
+        <div class="status">
+            <div class="spinner"></div>
+            <span>Waiting for scan...</span>
+        </div>
+
+        <button class="refresh-btn" onclick="location.reload()">🔄 Refresh QR Code</button>
+
+        <div class="footer">
+            QR Code expires in 60 seconds
+        </div>
+    </div>
+
+    <script>
+        // Generate QR Code
+        const qrCode = '` + qrCode + `';
+        QRCode.toCanvas(document.getElementById('qrcode'), qrCode, {
+            width: 280,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#ffffff'
+            }
+        });
+
+        // Auto refresh after 55 seconds
+        setTimeout(() => {
+            location.reload();
+        }, 55000);
+
+        // Check connection status every 3 seconds
+        let checkInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/session/status/` + deviceID + `');
+                const data = await response.json();
+
+                if (data.data && data.data.connected) {
+                    clearInterval(checkInterval);
+                    document.querySelector('.status').innerHTML = '<span style="color: #28a745;">✅ Connected Successfully!</span>';
+                    setTimeout(() => {
+                        window.location.href = '/qr/` + deviceID + `';
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }, 3000);
+    </script>
+</body>
+</html>`
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(http.StatusOK, html)
+}
+
+// renderHTMLConnected renders HTML page for already connected session
+func renderHTMLConnected(c *gin.Context, deviceID, phone string) {
+	html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAKU - Connected</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .success-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .info-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+        .info-value {
+            color: #333;
+            font-family: monospace;
+        }
+        .btn {
+            background: #11998e;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background: #0d7a6f;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">✅</div>
+        <h1>Already Connected!</h1>
+        <p class="subtitle">Your WhatsApp session is active</p>
+
+        <div class="info-box">
+            <div class="info-row">
+                <span class="info-label">Device ID:</span>
+                <span class="info-value">` + deviceID + `</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Phone Number:</span>
+                <span class="info-value">` + phone + `</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="info-value" style="color: #28a745;">Connected</span>
+            </div>
+        </div>
+
+        <a href="/session/status/` + deviceID + `" class="btn">📊 View Status</a>
+        <button onclick="logout()" class="btn btn-danger">🚪 Logout</button>
+    </div>
+
+    <script>
+        async function logout() {
+            if (confirm('Are you sure you want to logout this session?')) {
+                try {
+                    const response = await fetch('/session/logout/` + deviceID + `', {
+                        method: 'POST'
+                    });
+                    if (response.ok) {
+                        alert('Logged out successfully!');
+                        location.reload();
+                    }
+                } catch (error) {
+                    alert('Error logging out: ' + error.message);
+                }
+            }
+        }
+    </script>
+</body>
+</html>`
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(http.StatusOK, html)
+}
+
+// renderHTMLError renders HTML error page
+func renderHTMLError(c *gin.Context, title, message string) {
+	html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAKU - Error</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .error-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .message {
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        .btn {
+            background: #f5576c;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background: #e04455;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-icon">❌</div>
+        <h1>` + title + `</h1>
+        <p class="message">` + message + `</p>
+        <button onclick="location.reload()" class="btn">🔄 Try Again</button>
+    </div>
+</body>
+</html>`
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(http.StatusOK, html)
 }
 
 // LogoutSession logs out a session
