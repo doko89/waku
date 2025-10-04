@@ -325,7 +325,7 @@ func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
             font-size: 12px;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/lib/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -338,7 +338,7 @@ func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
         </div>
 
         <div class="qr-container">
-            <canvas id="qrcode"></canvas>
+            <div id="qrcode"></div>
         </div>
 
         <div class="instructions">
@@ -374,20 +374,18 @@ func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
 
             // Generate QR Code
             const qrCode = '` + qrCode + `';
-            const canvas = document.getElementById('qrcode');
+            const qrContainer = document.getElementById('qrcode');
 
-            QRCode.toCanvas(canvas, qrCode, {
+            // Clear previous QR code
+            qrContainer.innerHTML = '';
+
+            new QRCode(qrContainer, {
+                text: qrCode,
                 width: 280,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, function (error) {
-                if (error) {
-                    console.error('QR Code generation error:', error);
-                    document.querySelector('.qr-container').innerHTML = '<p style="color: red;">Error generating QR code. Please refresh.</p>';
-                }
+                height: 280,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
             });
         }
 
