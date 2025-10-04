@@ -557,23 +557,42 @@ make docker-clean
 
 ## 🚢 CI/CD
 
+### Initial Setup (One-time)
+
+**Optional but Recommended**: Set up Personal Access Token (PAT) for automatic workflow triggering.
+
+See detailed guide: [.github/SETUP.md](.github/SETUP.md)
+
+**Quick setup:**
+1. Create PAT with `repo` and `workflow` scopes
+2. Add as repository secret named `PAT_TOKEN`
+3. Done! Workflows will trigger automatically
+
+**Without PAT**: You can still use the workflows, but need to manually trigger the build workflow after creating a tag.
+
 ### Creating a Release
 
-1. **Manual Tag Creation** (via GitHub Actions):
+1. **Create Tag** (via GitHub Actions):
    - Go to Actions tab in GitHub
    - Select "Create Tag" workflow
    - Click "Run workflow"
-   - Enter version (e.g., `1.0.0`)
+   - Enter version (e.g., `1.0.1`)
    - Click "Run workflow"
 
-2. **Automatic Build**:
-   - When tag `v*.*.*` is pushed, build workflow automatically runs
+2. **Automatic Build** (if PAT_TOKEN is set):
+   - Build workflow automatically starts after tag is created
    - Builds binaries for multiple platforms:
      - Linux (amd64, arm64, arm/v7)
      - macOS (amd64, arm64)
      - Windows (amd64)
    - Builds multi-arch Docker images
    - Creates GitHub Release with all artifacts
+
+3. **Manual Build** (if PAT_TOKEN is not set):
+   - After tag is created, go to Actions → "Build and Release"
+   - Click "Run workflow"
+   - Enter the tag name (e.g., `v1.0.1`)
+   - Click "Run workflow"
 
 ### Docker Images
 
