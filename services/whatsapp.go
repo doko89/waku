@@ -233,14 +233,26 @@ func (s *WhatsAppService) loadSession(deviceID string) error {
 		return fmt.Errorf("failed to connect: %v", err)
 	}
 
-	// Check if already logged in
-	if client.IsLoggedIn() {
-		deviceClient.Connected = true
-		deviceClient.Phone = client.Store.ID.User
-		deviceClient.ConnectedAt = time.Now()
-		s.logger.Infof("Device %s is already logged in as %s", deviceID, deviceClient.Phone)
-	} else {
-		s.logger.Infof("Device %s loaded but not logged in, waiting for QR scan", deviceID)
+	// Wait a moment for connection to establish and check if already logged in with retry
+	s.logger.Infof("Device %s loaded, checking authentication status...", deviceID)
+
+	// Give WhatsApp time to authenticate the session
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			s.logger.Infof("Waiting for WhatsApp authentication... attempt %d/%d", i+1, maxRetries)
+			time.Sleep(time.Duration(i+1) * time.Second) // Progressive delay: 1s, 2s, 3s
+		}
+
+		if client.IsLoggedIn() {
+			deviceClient.Connected = true
+			deviceClient.Phone = client.Store.ID.User
+			deviceClient.ConnectedAt = time.Now()
+			s.logger.Infof("Device %s is already logged in as %s", deviceID, deviceClient.Phone)
+			break
+		} else if i == maxRetries-1 {
+			s.logger.Infof("Device %s loaded but not logged in, waiting for QR scan", deviceID)
+		}
 	}
 
 	// Store client
