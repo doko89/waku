@@ -236,38 +236,14 @@ func (s *WhatsAppService) CreateSession(deviceID string) (*DeviceClient, error) 
 
 // connectWithQR connects a client using QR code pairing
 func (s *WhatsAppService) connectWithQR(dc *DeviceClient) {
-	qrChan, err := dc.Client.GetQRChannel(context.Background())
-	if err != nil {
-		s.logger.Errorf("Failed to get QR channel: %v", err)
-		return
-	}
-
-	err = dc.Client.Connect()
+	// Event handler is already set up, just connect
+	err := dc.Client.Connect()
 	if err != nil {
 		s.logger.Errorf("Failed to connect: %v", err)
 		return
 	}
 
-	for evt := range qrChan {
-		if evt.Event == "code" {
-			// Send QR code to channel (non-blocking to avoid deadlock)
-			select {
-			case dc.QRChan <- evt.Code:
-				s.logger.Infof("QR code generated for device: %s", dc.DeviceID)
-			default:
-				// Channel is full, clear old QR codes and try again
-				select {
-				case <-dc.QRChan:
-					dc.QRChan <- evt.Code
-				default:
-					s.logger.Warnf("Failed to send QR code to channel for device: %s", dc.DeviceID)
-				}
-			}
-		} else if evt.Event == "success" {
-			s.logger.Infof("QR code scanned successfully for device: %s", dc.DeviceID)
-			break
-		}
-	}
+	s.logger.Infof("QR code connection initiated for device: %s", dc.DeviceID)
 }
 
 // reconnect attempts to reconnect an existing session
@@ -283,6 +259,27 @@ func (s *WhatsAppService) reconnect(dc *DeviceClient) {
 // eventHandler handles WhatsApp events for a device
 func (dc *DeviceClient) eventHandler(evt interface{}) {
 	switch v := evt.(type) {
+	case *events.QR:
+		// QR code event - send all codes to channel
+		for _, code := range v.Codes {
+			select {
+			case dc.QRChan <- code:
+				// Successfully sent QR code
+			default:
+				// Channel is full, clear old QR codes and try again
+				select {
+				case <-dc.QRChan:
+					dc.QRChan <- code
+				default:
+					// Still can't send, skip this QR code
+				}
+			}
+		}
+
+	case *events.PairSuccess:
+		// QR code scanned successfully
+		// Note: logger access will be fixed by making logger available to device client
+
 	case *events.Connected:
 		dc.Connected = true
 		dc.ConnectedAt = time.Now()

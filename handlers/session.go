@@ -73,33 +73,107 @@ func GetQRCode(c *gin.Context) {
 		return
 	}
 
-	// Wait for QR code with timeout
+	// Check if client is properly initialized for QR code generation
+	if deviceClient.Client == nil {
+		if isBrowserRequest(c) {
+			renderHTMLError(c, "Client not initialized", "Please recreate the session.")
+		} else {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Client not initialized. Please recreate the session.")
+		}
+		return
+	}
+
+	// Check if the client is already connected to WhatsApp servers
+	if deviceClient.Client.IsLoggedIn() {
+		// Client is logged in but not marked as connected in our state
+		if deviceClient.Client.Store.ID != nil {
+			deviceClient.Connected = true
+			deviceClient.Phone = deviceClient.Client.Store.ID.User
+			deviceClient.ConnectedAt = time.Now()
+
+			if isBrowserRequest(c) {
+				renderHTMLConnected(c, deviceID, deviceClient.Phone)
+			} else {
+				utils.SuccessResponse(c, http.StatusOK, "Already connected", gin.H{
+					"device_id": deviceID,
+					"status":    "connected",
+					"phone":     deviceClient.Phone,
+				})
+			}
+			return
+		}
+	}
+
+	// Try to get QR code with shorter timeout first
+	timeout1 := 5 * time.Second
+	timeout2 := 15 * time.Second
+
+	// First attempt - short timeout
 	select {
 	case qrCode := <-deviceClient.QRChan:
-		if isBrowserRequest(c) {
-			renderHTMLQRCode(c, deviceID, qrCode)
-		} else {
-			utils.SuccessResponse(c, http.StatusOK, "QR code generated", gin.H{
-				"device_id":  deviceID,
-				"qr_code":    qrCode,
-				"expires_in": 60,
-			})
+		if qrCode != "" {
+			if isBrowserRequest(c) {
+				renderHTMLQRCode(c, deviceID, qrCode)
+			} else {
+				utils.SuccessResponse(c, http.StatusOK, "QR code generated", gin.H{
+					"device_id":  deviceID,
+					"qr_code":    qrCode,
+					"expires_in": 60,
+				})
+			}
+			return
 		}
-
-	case <-time.After(15 * time.Second):
-		// Check if client is generating QR code
-		if deviceClient.Client != nil && deviceClient.Client.Store.ID == nil {
-			if isBrowserRequest(c) {
-				renderHTMLError(c, "QR code generation in progress", "QR code is being generated. Please wait a moment and refresh.")
-			} else {
-				utils.ErrorResponse(c, http.StatusRequestTimeout, "QR code is being generated. Please try again in a few seconds.")
+	case <-time.After(timeout1):
+		// If we have a client but no QR code yet, try longer timeout
+		if deviceClient.Client.Store.ID == nil {
+			select {
+			case qrCode := <-deviceClient.QRChan:
+				if qrCode != "" {
+					if isBrowserRequest(c) {
+						renderHTMLQRCode(c, deviceID, qrCode)
+					} else {
+						utils.SuccessResponse(c, http.StatusOK, "QR code generated", gin.H{
+							"device_id":  deviceID,
+							"qr_code":    qrCode,
+							"expires_in": 60,
+						})
+					}
+					return
+				}
+			case <-time.After(timeout2 - timeout1):
+				// Check client state
+				if deviceClient.Client.Store.ID == nil {
+					if isBrowserRequest(c) {
+						renderHTMLError(c, "QR code generation in progress", "QR code is being generated. This may take up to 30 seconds. Please refresh the page.")
+					} else {
+						utils.ErrorResponse(c, http.StatusRequestTimeout, "QR code generation in progress. Please try again in a few seconds.")
+					}
+				} else {
+					// Client connected during waiting
+					if isBrowserRequest(c) {
+						renderHTMLConnected(c, deviceID, deviceClient.Client.Store.ID.User)
+					} else {
+						utils.SuccessResponse(c, http.StatusOK, "Connected", gin.H{
+							"device_id": deviceID,
+							"status":    "connected",
+							"phone":     deviceClient.Client.Store.ID.User,
+						})
+					}
+				}
+				return
 			}
 		} else {
+			// Client has ID but not connected in our state
 			if isBrowserRequest(c) {
-				renderHTMLError(c, "QR code not ready", "Please refresh the page to try again.")
+				renderHTMLConnected(c, deviceID, deviceClient.Client.Store.ID.User)
 			} else {
-				utils.ErrorResponse(c, http.StatusRequestTimeout, "QR code not ready yet. Please try again.")
+				utils.SuccessResponse(c, http.StatusOK, "Connected", gin.H{
+					"device_id": deviceID,
+					"status":    "connected",
+					"phone":     deviceClient.Client.Store.ID.User,
+				})
 			}
+			return
 		}
 	}
 }
