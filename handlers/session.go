@@ -325,7 +325,7 @@ func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
             font-size: 12px;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/lib/qrcode.min.js"></script>
 </head>
 <body>
     <div class="container">
