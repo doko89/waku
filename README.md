@@ -555,43 +555,62 @@ make docker-logs
 make docker-clean
 ```
 
-## 🚢 CI/CD
+## 🚢 CI/CD & Releases
 
-### Creating a Release
+### Creating a Release (Automated)
 
 **Simple 1-Click Process:**
 
 1. Go to **Actions** → **"Create Tag and Build"**
 2. Click **"Run workflow"**
-3. Enter version (e.g., `1.0.2`)
+3. Enter version number **without 'v' prefix** (e.g., `1.0.2`)
 4. Click **"Run workflow"**
 
 **What happens automatically:**
-- ✅ Tag is created from latest commit
+- ✅ Tag `v1.0.2` is created from latest commit
 - ✅ Tag is pushed to GitHub
 - ✅ Build workflow is triggered automatically
-- ✅ Binaries are built for all platforms:
-  - Linux (amd64, arm64, arm/v7)
-  - macOS (amd64, arm64)
-  - Windows (amd64)
-- ✅ GitHub Release is created with all binaries
-- ✅ Changelog is generated from commits
+- ✅ Binaries are built for **7 platforms**:
+  - **Linux**: amd64, arm64, armv7
+  - **Windows**: amd64, arm64
+  - **macOS**: amd64 (Intel), arm64 (Apple Silicon)
+- ✅ Each binary is compressed (tar.gz/zip)
+- ✅ SHA256 checksums are generated
+- ✅ GitHub Release is created with:
+  - All binaries
+  - Checksums
+  - Changelog from commits
+  - Quick start guide
 
-**Total time:** ~5-10 minutes (no Docker build, much faster!)
+**Total time:** ~5-10 minutes
 
 ### Manual Release (Alternative)
 
-You can also create releases manually via command line:
+You can also create releases via command line:
 
 ```bash
 # Pull latest changes
 git pull origin main
 
-# Create and push tag
+# Create and push tag (with 'v' prefix)
 git tag -a v1.0.2 -m "Release v1.0.2"
 git push origin v1.0.2
 
 # Build workflow will trigger automatically
+```
+
+### Download Pre-built Binaries
+
+After release is created, download from:
+- GitHub Releases: https://github.com/YOUR_USERNAME/waku/releases
+
+**Verify downloads:**
+```bash
+# Linux/macOS
+sha256sum -c waku-linux-amd64.tar.gz.sha256
+
+# Windows (PowerShell)
+Get-FileHash waku-windows-amd64.zip -Algorithm SHA256
 ```
 
 ### Docker Images
