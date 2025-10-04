@@ -11,10 +11,6 @@ on:
         required: false
         type: string
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -90,53 +86,8 @@ jobs:
           path: dist/*.{tar.gz,zip}
           if-no-files-found: error
 
-  docker:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   release:
-    needs: [build, docker]
+    needs: [build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -162,14 +113,20 @@ jobs:
           echo "## What's Changed" > CHANGELOG.md
           git log --pretty=format:"- %s (%h)" $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")..HEAD >> CHANGELOG.md || echo "- Initial release" >> CHANGELOG.md
           echo "" >> CHANGELOG.md
-          echo "## Docker Images" >> CHANGELOG.md
+          echo "## Available Binaries" >> CHANGELOG.md
           echo "" >> CHANGELOG.md
-          echo "Multi-architecture Docker images are available:" >> CHANGELOG.md
+          echo "Download the appropriate binary for your platform:" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "- **Linux**: amd64, arm64, arm/v7" >> CHANGELOG.md
+          echo "- **macOS**: amd64 (Intel), arm64 (Apple Silicon)" >> CHANGELOG.md
+          echo "- **Windows**: amd64" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## Docker Image" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "Build your own Docker image:" >> CHANGELOG.md
           echo '```bash' >> CHANGELOG.md
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_REF#refs/tags/v}" >> CHANGELOG.md
+          echo "docker build -t waku:${GITHUB_REF#refs/tags/v} ." >> CHANGELOG.md
           echo '```' >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "Supported platforms: linux/amd64, linux/arm64, linux/arm/v7" >> CHANGELOG.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
