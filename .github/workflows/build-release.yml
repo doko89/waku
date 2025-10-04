@@ -1,0 +1,207 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  GO_VERSION: '1.21'
+  APP_NAME: 'myapp' # Ganti dengan nama aplikasi Anda
+
+jobs:
+  build:
+    name: Build Multi-Arch Binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - goos: linux
+            goarch: amd64
+            platform: linux-amd64
+          - goos: linux
+            goarch: arm64
+            platform: linux-arm64
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            platform: linux-armv7
+          
+          # Windows
+          - goos: windows
+            goarch: amd64
+            platform: windows-amd64
+          - goos: windows
+            goarch: arm64
+            platform: windows-arm64
+          
+          # macOS
+          - goos: darwin
+            goarch: amd64
+            platform: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            platform: darwin-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          # Tentukan nama file output
+          OUTPUT_NAME="${{ env.APP_NAME }}-${{ matrix.platform }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            OUTPUT_NAME="${OUTPUT_NAME}.exe"
+          fi
+          
+          # Build dengan informasi version
+          VERSION=${GITHUB_REF#refs/tags/}
+          COMMIT=$(git rev-parse --short HEAD)
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          
+          go build \
+            -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=${BUILD_TIME}" \
+            -trimpath \
+            -o "dist/${OUTPUT_NAME}" \
+            .
+          
+          echo "Built: dist/${OUTPUT_NAME}"
+          ls -lh dist/
+
+      - name: Create archive
+        run: |
+          cd dist
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            zip "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" "${{ env.APP_NAME }}-${{ matrix.platform }}.exe"
+            echo "ASSET_PATH=dist/${{ env.APP_NAME }}-${{ matrix.platform }}.zip" >> $GITHUB_ENV
+            echo "ASSET_NAME=${{ env.APP_NAME }}-${{ matrix.platform }}.zip" >> $GITHUB_ENV
+          else
+            tar czf "${{ env.APP_NAME }}-${{ matrix.platform }}.tar.gz" "${{ env.APP_NAME }}-${{ matrix.platform }}"
+            echo "ASSET_PATH=dist/${{ env.APP_NAME }}-${{ matrix.platform }}.tar.gz" >> $GITHUB_ENV
+            echo "ASSET_NAME=${{ env.APP_NAME }}-${{ matrix.platform }}.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Generate checksum
+        run: |
+          cd dist
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            sha256sum "${{ env.APP_NAME }}-${{ matrix.platform }}.zip" > "${{ env.APP_NAME }}-${{ matrix.platform }}.zip.sha256"
+          else
+            sha256sum "${{ env.APP_NAME }}-${{ matrix.platform }}.tar.gz" > "${{ env.APP_NAME }}-${{ matrix.platform }}.tar.gz.sha256"
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: |
+            ${{ env.ASSET_PATH }}
+            ${{ env.ASSET_PATH }}.sha256
+          retention-days: 1
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \) -exec cp {} release-assets/ \;
+          ls -lh release-assets/
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          PREV_TAG=$(git describe --abbrev=0 --tags ${GITHUB_REF}^ 2>/dev/null || echo "")
+          
+          echo "# Release ${VERSION}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "## What's Changed" >> release_notes.md
+          
+          if [ -n "$PREV_TAG" ]; then
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> release_notes.md
+          else
+            git log --pretty=format:"- %s (%h)" >> release_notes.md
+          fi
+          
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Download" >> release_notes.md
+          echo "Choose the appropriate binary for your platform:" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Linux" >> release_notes.md
+          echo "- **amd64**: Standard 64-bit Linux systems" >> release_notes.md
+          echo "- **arm64**: ARM 64-bit systems (e.g., Raspberry Pi 4/5)" >> release_notes.md
+          echo "- **armv7**: ARM 32-bit systems (e.g., older Raspberry Pi)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Windows" >> release_notes.md
+          echo "- **amd64**: Standard 64-bit Windows systems" >> release_notes.md
+          echo "- **arm64**: ARM 64-bit Windows systems" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### macOS" >> release_notes.md
+          echo "- **amd64**: Intel-based Macs" >> release_notes.md
+          echo "- **arm64**: Apple Silicon Macs (M1/M2/M3)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Verification" >> release_notes.md
+          echo "Verify your download using SHA256 checksums:" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo 'sha256sum -c <filename>.sha256' >> release_notes.md
+          echo '```' >> release_notes.md
+          
+          cat release_notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-assets/*
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "🎉 Release ${VERSION} created successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Built Platforms:" >> $GITHUB_STEP_SUMMARY
+          echo "- Linux: amd64, arm64, armv7" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows: amd64, arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- macOS: amd64, arm64" >> $GITHUB_STEP_SUMMARY
