@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
@@ -65,6 +66,15 @@ func GetWebhookService() *WebhookService {
 	return webhookService
 }
 
+// extractPhoneNumber extracts the phone number from a JID
+func extractPhoneNumber(jid types.JID) string {
+	// Remove the domain part and return just the user part
+	user := jid.User
+	// For regular users, this is the phone number
+	// For groups, this will be the group ID, but we handle that separately
+	return user
+}
+
 // HandleIncomingMessage processes incoming WhatsApp messages and sends to webhook
 func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Message) {
 	if !w.enabled || w.webhookURL == "" {
@@ -73,12 +83,13 @@ func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Mess
 	}
 
 	fmt.Printf("Forwarding message from device %s to webhook: %s\n", deviceID, w.webhookURL)
+	fmt.Printf("Original JID: %s, User: %s, IsGroup: %v\n", evt.Info.Sender.String(), evt.Info.Sender.User, evt.Info.IsGroup)
 
 	// Build webhook payload
 	payload := WebhookPayload{
 		DeviceID:    deviceID,
 		MessageID:   evt.Info.ID,
-		From:        evt.Info.Sender.String(),
+		From:        extractPhoneNumber(evt.Info.Sender),
 		FromName:    evt.Info.PushName,
 		Timestamp:   evt.Info.Timestamp.Unix(),
 		IsGroup:     evt.Info.IsGroup,
@@ -105,9 +116,9 @@ func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Mess
 
 	// Handle group messages
 	if evt.Info.IsGroup {
-		groupJID := evt.Info.Chat.String()
+		groupJID := extractPhoneNumber(evt.Info.Chat)
 		payload.GroupJID = &groupJID
-		// Group name would need to be fetched from group info
+		fmt.Printf("Group message - Group JID: %s\n", groupJID)
 	}
 
 	// Send to webhook with retry

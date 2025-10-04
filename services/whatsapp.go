@@ -377,8 +377,23 @@ func (s *WhatsAppService) SendMessage(deviceID, phone, message string) (string, 
 		return "", 0, err
 	}
 
+	// Check if client is connected, if not but logged in, try to reconnect
 	if !client.Connected {
-		return "", 0, fmt.Errorf("session not connected. Please scan QR code first")
+		// Check if client is logged in but not marked as connected
+		if client.Client.IsLoggedIn() && client.Client.Store.ID != nil {
+			// Try to reconnect
+			if err := client.Client.Connect(); err != nil {
+				return "", 0, fmt.Errorf("session not connected and failed to reconnect: %v", err)
+			}
+			// Wait a moment for connection to establish
+			time.Sleep(500 * time.Millisecond)
+			// Update connection status
+			client.Connected = true
+			client.Phone = client.Client.Store.ID.User
+			client.ConnectedAt = time.Now()
+		} else {
+			return "", 0, fmt.Errorf("session not connected. Please scan QR code first")
+		}
 	}
 
 	// Parse JID
