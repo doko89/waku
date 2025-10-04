@@ -83,14 +83,32 @@ func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Mess
 	}
 
 	fmt.Printf("Forwarding message from device %s to webhook: %s\n", deviceID, w.webhookURL)
-	fmt.Printf("Original JID: %s, User: %s, IsGroup: %v\n", evt.Info.Sender.String(), evt.Info.Sender.User, evt.Info.IsGroup)
+	fmt.Printf("Message Info - ID: %s, Sender: %s, Chat: %s, IsFromMe: %v, IsGroup: %v\n",
+		evt.Info.ID, evt.Info.Sender.String(), evt.Info.Chat.String(), evt.Info.IsFromMe, evt.Info.IsGroup)
+	fmt.Printf("Original JID: %s, User: %s\n", evt.Info.Sender.String(), evt.Info.Sender.User)
+
+	// Determine the actual sender
+	var actualSender types.JID
+	var actualSenderName string
+
+	if evt.Info.IsFromMe {
+		// This is a message sent by ourselves
+		actualSender = evt.Info.Sender
+		actualSenderName = "Me"
+		fmt.Printf("Message from self - using Sender: %s\n", actualSender.String())
+	} else {
+		// This is a message from someone else - use Chat JID for incoming messages
+		actualSender = evt.Info.Chat
+		actualSenderName = evt.Info.PushName
+		fmt.Printf("Message from others - using Chat: %s, PushName: %s\n", actualSender.String(), actualSenderName)
+	}
 
 	// Build webhook payload
 	payload := WebhookPayload{
 		DeviceID:    deviceID,
 		MessageID:   evt.Info.ID,
-		From:        extractPhoneNumber(evt.Info.Sender),
-		FromName:    evt.Info.PushName,
+		From:        extractPhoneNumber(actualSender),
+		FromName:    actualSenderName,
 		Timestamp:   evt.Info.Timestamp.Unix(),
 		IsGroup:     evt.Info.IsGroup,
 		MessageType: "text",
