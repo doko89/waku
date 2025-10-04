@@ -66,6 +66,7 @@ func main() {
 	}))
 
 	// Public routes (no authentication required)
+	router.GET("/health", handlers.HealthCheck)
 	router.GET("/qr/:device_id", handlers.GetQRCode)
 	router.GET("/session/:device_id/status", handlers.GetSessionStatus) // Make status public for browser polling
 

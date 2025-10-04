@@ -722,3 +722,12 @@ func ListSessions(c *gin.Context) {
 		"sessions": sessionList,
 	})
 }
+
+// HealthCheck handles health check requests
+func HealthCheck(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "healthy",
+		"service": "waku-whatsapp-api",
+		"time":    time.Now().Format(time.RFC3339),
+	})
+}
