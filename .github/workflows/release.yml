@@ -39,19 +39,29 @@ jobs:
       - name: Bump version safely
         id: bump
         run: |
+          set +e
           LATEST="${{ steps.get_tag.outputs.latest_tag }}"
-          PREFIX="${{ github.event.inputs.tag_prefix }}" # biasanya 'v'
+          PREFIX="${{ github.event.inputs.tag_prefix }}" # contoh: v
 
-          # Hapus prefix v dari versi terakhir
-          VERSION="${LATEST#$PREFIX}"
+          VERSION="$LATEST"
+          # Hapus prefix 'v' jika ada
+          if [[ "$VERSION" == "$PREFIX"* ]]; then
+            VERSION="${VERSION#$PREFIX}"
+          fi
 
-          # Validasi format versi
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          # Validasi format versi (harus X.Y.Z)
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "❌ Invalid version format ($VERSION), fallback ke 0.0.0"
             VERSION="0.0.0"
           fi
+          set -e
 
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # fallback untuk angka kosong
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
 
           case "${{ github.event.inputs.bump }}" in
             major) ((MAJOR++)); MINOR=0; PATCH=0 ;;
@@ -60,12 +70,11 @@ jobs:
           esac
 
           NEW_TAG="${PREFIX}${MAJOR}.${MINOR}.${PATCH}"
-          echo "✅ New tag: $NEW_TAG"
+          echo "✅ LATEST=$LATEST"
+          echo "✅ VERSION=$VERSION"
+          echo "✅ NEW_TAG=$NEW_TAG"
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
-
-          NEW_TAG="${PREFIX}${MAJOR}.${MINOR}.${PATCH}"
-          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
       - name: Create tag and push
         run: |
