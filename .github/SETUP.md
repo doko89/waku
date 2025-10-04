@@ -1,105 +1,186 @@
 # GitHub Actions Setup Guide
 
-This guide explains how to use GitHub Actions for WAKU project to create releases.
+This guide explains how to set up and use GitHub Actions for WAKU project to create automated releases.
 
 ## Prerequisites
 
 - Repository admin or write access
 - GitHub account
 
-## No Setup Required! 🎉
+## Setup Required: SSH Deploy Key
 
-The workflows are ready to use out of the box. No Personal Access Token (PAT) or additional configuration needed.
+The workflow uses SSH Deploy Key to push tags, which allows it to trigger the build workflow automatically.
 
-The tag workflow now uses direct `git push` which automatically triggers the build workflow.
+### Why SSH Deploy Key?
+
+By default, when a workflow uses `GITHUB_TOKEN` to push tags, GitHub **does not trigger** other workflows (to prevent recursive workflows). To solve this, we use an SSH Deploy Key which is treated as an external push, thus triggering the build workflow.
+
+## Setup Steps
+
+### 1. Generate SSH Key Pair
+
+On your local machine:
+
+```bash
+# Generate a new SSH key (no passphrase)
+ssh-keygen -t ed25519 -C "github-actions-waku" -f ~/.ssh/waku_deploy_key -N ""
+
+# This creates two files:
+# - waku_deploy_key (private key)
+# - waku_deploy_key.pub (public key)
+```
+
+### 2. Add Deploy Key to Repository
+
+1. **Copy the public key**:
+   ```bash
+   cat ~/.ssh/waku_deploy_key.pub
+   ```
+
+2. **Add to GitHub**:
+   - Go to: https://github.com/YOUR_USERNAME/waku/settings/keys
+   - Click "Add deploy key"
+   - Title: `GitHub Actions Deploy Key`
+   - Key: Paste the public key content
+   - ✅ Check "Allow write access"
+   - Click "Add key"
+
+### 3. Add Private Key to Secrets
+
+1. **Copy the private key**:
+   ```bash
+   cat ~/.ssh/waku_deploy_key
+   ```
+
+2. **Add to GitHub Secrets**:
+   - Go to: https://github.com/YOUR_USERNAME/waku/settings/secrets/actions
+   - Click "New repository secret"
+   - Name: `SSH_DEPLOY_KEY`
+   - Secret: Paste the **entire private key** (including `-----BEGIN` and `-----END` lines)
+   - Click "Add secret"
+
+### 4. Verify Setup
+
+After adding both keys:
+
+1. Go to: https://github.com/YOUR_USERNAME/waku/actions/workflows/create-tag.yml
+2. Click "Run workflow"
+3. Enter a test version (e.g., `1.0.3`)
+4. Click "Run workflow"
+5. Watch both workflows run:
+   - ✅ Create Tag workflow
+   - ✅ Build and Release workflow (auto-triggered)
 
 ## How to Use
 
-1. Go to "Actions" tab in your repository
+### Creating a Release
 
-2. You should see two workflows:
-   - ✅ Create Tag
-   - ✅ Build and Release
+1. **Go to Actions**:
+   - https://github.com/YOUR_USERNAME/waku/actions/workflows/create-tag.yml
 
-### 4. Test the Workflow
+2. **Click "Run workflow"**
 
-1. Go to "Actions" → "Create Tag"
+3. **Enter version** (without 'v' prefix):
+   - Example: `1.0.3`
 
-2. Click "Run workflow"
+4. **Click "Run workflow"**
 
-3. Enter a version number (e.g., `1.0.1`)
-
-4. Click "Run workflow"
-
-5. Watch the workflow run:
-   - ✅ Tag workflow creates the tag
-   - ✅ Build workflow automatically starts (triggered by the tag)
-   - ✅ Binaries are built for all platforms
-   - ✅ Docker images are built and pushed
+5. **Watch the magic happen**:
+   - ✅ Tag `v1.0.3` is created
+   - ✅ Tag is pushed via SSH
+   - ✅ Build workflow automatically starts
+   - ✅ Binaries are built for 7 platforms
    - ✅ GitHub Release is created with all artifacts
+
+### Available Workflows
+
+You should see two workflows in Actions tab:
+
+1. **Create Tag and Build** - Main workflow to create releases
+2. **Build and Release** - Automatically triggered by tags
 
 ## Workflow Behavior
 
-### With PAT_TOKEN (Recommended)
+### With SSH_DEPLOY_KEY (Current Setup)
 
 ```
-User triggers "Create Tag" workflow
+User triggers "Create Tag and Build" workflow
     ↓
-Tag is created and pushed
+Checkout code with SSH agent
     ↓
-Build workflow is AUTOMATICALLY triggered
+Validate version format
     ↓
-Binaries + Docker images are built
+Pull latest changes
     ↓
-GitHub Release is created
+Create tag v1.0.3
+    ↓
+Push tag via SSH (git@github.com:...)
+    ↓
+Build workflow is AUTOMATICALLY triggered ✅
+    ↓
+Build binaries for 7 platforms
+    ↓
+Generate checksums
+    ↓
+Create GitHub Release with all artifacts
+    ↓
+🎉 Done! Release is live!
 ```
 
-### Without PAT_TOKEN (Fallback)
+**Total time:** ~5-10 minutes
 
-If you don't set up PAT_TOKEN, the workflow will still work but with a limitation:
+### Without SSH_DEPLOY_KEY (Not Recommended)
 
-```
-User triggers "Create Tag" workflow
-    ↓
-Tag is created and pushed
-    ↓
-Build workflow tries to trigger (may fail)
-    ↓
-User needs to manually trigger "Build and Release" workflow
-```
+If SSH_DEPLOY_KEY is not set, the workflow will fail or build won't trigger automatically.
 
-**Manual trigger steps:**
-1. Go to "Actions" → "Build and Release"
-2. Click "Run workflow"
-3. Enter the tag name (e.g., `v1.0.1`)
-4. Click "Run workflow"
+**Why?** Because `GITHUB_TOKEN` cannot trigger other workflows (GitHub security feature).
 
 ## Troubleshooting
 
 ### Build workflow doesn't start automatically
 
 **Possible causes:**
-1. PAT_TOKEN is not set or expired
-2. PAT_TOKEN doesn't have correct permissions
+1. `SSH_DEPLOY_KEY` secret is not set
+2. Deploy key is not added to repository
+3. Deploy key doesn't have write access
 
 **Solution:**
-- Verify PAT_TOKEN secret exists in repository settings
-- Check token expiration date
-- Regenerate token with correct scopes if needed
-- Manually trigger build workflow as fallback
+1. Verify `SSH_DEPLOY_KEY` secret exists:
+   - Go to: https://github.com/YOUR_USERNAME/waku/settings/secrets/actions
+   - Check if `SSH_DEPLOY_KEY` is listed
+
+2. Verify deploy key is added:
+   - Go to: https://github.com/YOUR_USERNAME/waku/settings/keys
+   - Check if deploy key exists with write access
+
+3. If missing, follow setup steps above
 
 ### Tag already exists error
 
 **Solution:**
 ```bash
-# Delete tag locally
-git tag -d v1.0.0
+# Delete tag locally (if exists)
+git tag -d v1.0.3
 
 # Delete tag on GitHub
-git push origin :refs/tags/v1.0.0
+git push origin :refs/tags/v1.0.3
+
+# Delete release (if exists)
+# Go to: https://github.com/YOUR_USERNAME/waku/releases
+# Click on the release → Delete
 
 # Try again with the same or different version
 ```
+
+### SSH authentication failed
+
+**Error message:** `Permission denied (publickey)`
+
+**Solution:**
+1. Regenerate SSH key pair
+2. Make sure you copied the **entire** private key (including BEGIN/END lines)
+3. Make sure public key is added as deploy key with write access
+4. Try again
 
 ### Build fails
 
@@ -108,60 +189,68 @@ git push origin :refs/tags/v1.0.0
 2. Click on the failed workflow run
 3. Check the logs for specific errors
 4. Common issues:
-   - Go version mismatch
-   - Missing dependencies
-   - Docker build errors
+   - Go version mismatch (should be 1.24)
+   - Missing dependencies (run `go mod download`)
+   - Platform-specific build errors
 
 ## Security Notes
 
-### PAT Token Security
+### SSH Deploy Key Security
 
-- ✅ **DO**: Store PAT in repository secrets (encrypted)
-- ✅ **DO**: Use minimal required scopes
-- ✅ **DO**: Set expiration date
-- ✅ **DO**: Rotate tokens periodically
-- ❌ **DON'T**: Share PAT with anyone
-- ❌ **DON'T**: Commit PAT to code
-- ❌ **DON'T**: Use PAT in public logs
+- ✅ **DO**: Store private key in repository secrets (encrypted)
+- ✅ **DO**: Use key only for this repository
+- ✅ **DO**: Enable write access only if needed
+- ✅ **DO**: Delete old keys when rotating
+- ❌ **DON'T**: Share private key with anyone
+- ❌ **DON'T**: Commit private key to code
+- ❌ **DON'T**: Use same key for multiple repositories
+- ❌ **DON'T**: Add passphrase (GitHub Actions can't handle it)
 
-### Token Permissions
+### Key Rotation
 
-The PAT only needs:
-- `repo` - To push tags and create releases
-- `workflow` - To trigger workflows
+Rotate SSH keys periodically (e.g., every 6-12 months):
 
-It does NOT need:
-- Admin permissions
-- Delete permissions
-- User permissions
+1. Generate new SSH key pair
+2. Add new public key as deploy key
+3. Update `SSH_DEPLOY_KEY` secret with new private key
+4. Test workflow
+5. Delete old deploy key
 
-## Alternative: Using GitHub App
+## Alternative: Using Personal Access Token (PAT)
 
-For better security, you can use a GitHub App instead of PAT:
+If you prefer PAT over SSH:
 
-1. Create a GitHub App with repository permissions
-2. Install the app on your repository
-3. Use app authentication in workflows
+1. Create PAT with `repo` and `workflow` scopes
+2. Add as `PAT_TOKEN` secret
+3. Modify workflow to use PAT instead of SSH
 
-This is more complex but provides better security and audit trails.
+**Note:** SSH Deploy Key is more secure and recommended for CI/CD.
 
 ## Support
 
 If you encounter issues:
 1. Check workflow logs in Actions tab
-2. Verify all secrets are set correctly
-3. Check token permissions and expiration
-4. Open an issue on GitHub
+2. Verify SSH_DEPLOY_KEY secret is set correctly
+3. Verify deploy key has write access
+4. Check SSH key format (must include BEGIN/END lines)
+5. Open an issue on GitHub
 
 ## Summary
 
-✅ **Recommended Setup:**
-- Create PAT with `repo` and `workflow` scopes
-- Add as `PAT_TOKEN` secret
-- Workflows will work automatically
+✅ **Current Setup (SSH Deploy Key):**
+- Generate SSH key pair
+- Add public key as deploy key (with write access)
+- Add private key as `SSH_DEPLOY_KEY` secret
+- Workflows work automatically
+- More secure than PAT
 
-✅ **Minimal Setup:**
-- Skip PAT creation
-- Manually trigger build workflow after creating tag
-- Still fully functional, just requires one extra step
+✅ **Benefits:**
+- ✅ Automatic build triggering
+- ✅ No token expiration issues
+- ✅ Repository-specific access
+- ✅ Better security audit trail
+- ✅ No manual intervention needed
+
+🎯 **Result:**
+One-click release creation with full automation!
 
