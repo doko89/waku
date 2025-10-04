@@ -406,14 +406,14 @@ func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
         // Check connection status every 3 seconds
         let checkInterval = setInterval(async () => {
             try {
-                const response = await fetch(\`/session/\${deviceID}/status\`);
+                const response = await fetch('/session/' + deviceID + '/status');
                 const data = await response.json();
 
                 if (data.data && data.data.connected) {
                     clearInterval(checkInterval);
                     document.querySelector('.status').innerHTML = '<span style="color: #28a745;">✅ Connected Successfully!</span>';
                     setTimeout(() => {
-                        window.location.href = \`/qr/\${deviceID}\`;
+                        window.location.href = '/qr/' + deviceID;
                     }, 2000);
                 }
             } catch (error) {
