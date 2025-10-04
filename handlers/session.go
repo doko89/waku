@@ -323,7 +323,7 @@ func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
         // Check connection status every 3 seconds
         let checkInterval = setInterval(async () => {
             try {
-                const response = await fetch('/session/status/` + deviceID + `');
+                const response = await fetch('/session/` + deviceID + `/status');
                 const data = await response.json();
 
                 if (data.data && data.data.connected) {
@@ -458,7 +458,7 @@ func renderHTMLConnected(c *gin.Context, deviceID, phone string) {
             </div>
         </div>
 
-        <a href="/session/status/` + deviceID + `" class="btn">📊 View Status</a>
+        <a href="/session/` + deviceID + `/status" class="btn">📊 View Status</a>
         <button onclick="logout()" class="btn btn-danger">🚪 Logout</button>
     </div>
 
@@ -466,7 +466,7 @@ func renderHTMLConnected(c *gin.Context, deviceID, phone string) {
         async function logout() {
             if (confirm('Are you sure you want to logout this session?')) {
                 try {
-                    const response = await fetch('/session/logout/` + deviceID + `', {
+                    const response = await fetch('/logout/` + deviceID + `', {
                         method: 'POST'
                     });
                     if (response.ok) {
