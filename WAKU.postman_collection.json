@@ -1,0 +1,299 @@
+{
+	"info": {
+		"_postman_id": "waku-api-collection",
+		"name": "WAKU - WhatsApp API",
+		"description": "Complete API collection for WAKU WhatsApp API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{API_TOKEN}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "BASE_URL",
+			"value": "http://localhost:8081",
+			"type": "string"
+		},
+		{
+			"key": "API_TOKEN",
+			"value": "waku-secret-token-change-this-in-production",
+			"type": "string"
+		},
+		{
+			"key": "DEVICE_ID",
+			"value": "device001",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Session Management",
+			"item": [
+				{
+					"name": "Create Session",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"device_id\": \"{{DEVICE_ID}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/session/create",
+							"host": ["{{BASE_URL}}"],
+							"path": ["session", "create"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get QR Code (JSON)",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/qr/{{DEVICE_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["qr", "{{DEVICE_ID}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Session Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/session/{{DEVICE_ID}}/status",
+							"host": ["{{BASE_URL}}"],
+							"path": ["session", "{{DEVICE_ID}}", "status"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List All Sessions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/sessions",
+							"host": ["{{BASE_URL}}"],
+							"path": ["sessions"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout Session",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/logout/{{DEVICE_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["logout", "{{DEVICE_ID}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Session",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/session/{{DEVICE_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["session", "{{DEVICE_ID}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Messaging",
+			"item": [
+				{
+					"name": "Send Personal Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"device_id\": \"{{DEVICE_ID}}\",\n  \"phone\": \"628123456789\",\n  \"message\": \"Hello from WAKU!\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/send",
+							"host": ["{{BASE_URL}}"],
+							"path": ["send"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Group Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"device_id\": \"{{DEVICE_ID}}\",\n  \"group_jid\": \"120363XXXXX@g.us\",\n  \"message\": \"Hello group!\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/send-group",
+							"host": ["{{BASE_URL}}"],
+							"path": ["send-group"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Media",
+			"item": [
+				{
+					"name": "Send Personal Media",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "device_id",
+									"value": "{{DEVICE_ID}}",
+									"type": "text"
+								},
+								{
+									"key": "phone",
+									"value": "628123456789",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "caption",
+									"value": "Check this out!",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/send-media",
+							"host": ["{{BASE_URL}}"],
+							"path": ["send-media"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Group Media",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "device_id",
+									"value": "{{DEVICE_ID}}",
+									"type": "text"
+								},
+								{
+									"key": "group_jid",
+									"value": "120363XXXXX@g.us",
+									"type": "text"
+								},
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "caption",
+									"value": "Check this out!",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/send-group-media",
+							"host": ["{{BASE_URL}}"],
+							"path": ["send-group-media"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Information",
+			"item": [
+				{
+					"name": "Get Contacts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/contacts/{{DEVICE_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["contacts", "{{DEVICE_ID}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Groups",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/groups/{{DEVICE_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["groups", "{{DEVICE_ID}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
+

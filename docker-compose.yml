@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  waku:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: waku-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - API_TOKEN=${API_TOKEN:-waku-secret-token-change-this-in-production}
+      - PORT=8080
+      - SESSION_DIR=/app/sessions
+      - TEMP_MEDIA_DIR=/app/temp
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - WEBHOOK_ENABLED=${WEBHOOK_ENABLED:-false}
+      - WEBHOOK_RETRY=${WEBHOOK_RETRY:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./sessions:/app/sessions
+      - ./temp:/app/temp
+    networks:
+      - waku-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/qr/healthcheck"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  waku-network:
+    driver: bridge
+
+volumes:
+  sessions:
+  temp:
+

@@ -1,0 +1,76 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Session files
+sessions/
+*.db
+*.db-shm
+*.db-wal
+
+# Temporary media files
+temp/
+uploads/
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+waku
+waku-*
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Build and release
+dist/
+build/
+bin/
+*.tar.gz
+*.zip
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Docker
+.dockerignore
+
+# Coverage
+coverage.txt
+coverage.html
+*.coverprofile
+
+# Release notes
+release_notes.md
+CHANGELOG.md
+
