@@ -557,59 +557,57 @@ make docker-clean
 
 ## 🚢 CI/CD
 
-### Initial Setup (One-time)
-
-**Optional but Recommended**: Set up Personal Access Token (PAT) for automatic workflow triggering.
-
-See detailed guide: [.github/SETUP.md](.github/SETUP.md)
-
-**Quick setup:**
-1. Create PAT with `repo` and `workflow` scopes
-2. Add as repository secret named `PAT_TOKEN`
-3. Done! Workflows will trigger automatically
-
-**Without PAT**: You can still use the workflows, but need to manually trigger the build workflow after creating a tag.
-
 ### Creating a Release
 
-1. **Create Tag** (via GitHub Actions):
-   - Go to Actions tab in GitHub
-   - Select "Create Tag" workflow
-   - Click "Run workflow"
-   - Enter version (e.g., `1.0.1`)
-   - Click "Run workflow"
+**Simple 1-Click Process:**
 
-2. **Automatic Build** (if PAT_TOKEN is set):
-   - Build workflow automatically starts after tag is created
-   - Builds binaries for multiple platforms:
-     - Linux (amd64, arm64, arm/v7)
-     - macOS (amd64, arm64)
-     - Windows (amd64)
-   - Builds multi-arch Docker images
-   - Creates GitHub Release with all artifacts
+1. Go to **Actions** → **"Create Tag and Build"**
+2. Click **"Run workflow"**
+3. Enter version (e.g., `1.0.2`)
+4. Click **"Run workflow"**
 
-3. **Manual Build** (if PAT_TOKEN is not set):
-   - After tag is created, go to Actions → "Build and Release"
-   - Click "Run workflow"
-   - Enter the tag name (e.g., `v1.0.1`)
-   - Click "Run workflow"
+**What happens automatically:**
+- ✅ Tag is created from latest commit
+- ✅ Tag is pushed to GitHub
+- ✅ Build workflow is triggered automatically
+- ✅ Binaries are built for all platforms:
+  - Linux (amd64, arm64, arm/v7)
+  - macOS (amd64, arm64)
+  - Windows (amd64)
+- ✅ GitHub Release is created with all binaries
+- ✅ Changelog is generated from commits
+
+**Total time:** ~5-10 minutes (no Docker build, much faster!)
+
+### Manual Release (Alternative)
+
+You can also create releases manually via command line:
+
+```bash
+# Pull latest changes
+git pull origin main
+
+# Create and push tag
+git tag -a v1.0.2 -m "Release v1.0.2"
+git push origin v1.0.2
+
+# Build workflow will trigger automatically
+```
 
 ### Docker Images
 
-Multi-architecture Docker images are automatically built and pushed to GitHub Container Registry:
+Docker images are not pre-built in CI/CD (to save time), but you can easily build your own:
 
 ```bash
-# Pull specific version
-docker pull ghcr.io/YOUR_USERNAME/waku:1.0.0
+# Build for your platform
+docker build -t waku:1.0.2 .
 
-# Pull latest
-docker pull ghcr.io/YOUR_USERNAME/waku:latest
+# Or use docker-compose
+docker-compose build
+
+# Multi-arch build (requires buildx)
+docker buildx build --platform linux/amd64,linux/arm64 -t waku:1.0.2 .
 ```
-
-Supported platforms:
-- `linux/amd64`
-- `linux/arm64`
-- `linux/arm/v7`
 
 ## 📦 Postman Collection
 

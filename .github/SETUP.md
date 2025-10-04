@@ -1,57 +1,19 @@
 # GitHub Actions Setup Guide
 
-This guide explains how to set up GitHub Actions for WAKU project to enable automatic builds and releases.
+This guide explains how to use GitHub Actions for WAKU project to create releases.
 
 ## Prerequisites
 
-- Repository admin access
+- Repository admin or write access
 - GitHub account
 
-## Setup Steps
+## No Setup Required! 🎉
 
-### 1. Create Personal Access Token (PAT) - Optional but Recommended
+The workflows are ready to use out of the box. No Personal Access Token (PAT) or additional configuration needed.
 
-Creating a PAT allows the tag workflow to trigger the build workflow automatically.
+The tag workflow now uses direct `git push` which automatically triggers the build workflow.
 
-**Why is this needed?**
-- By default, `GITHUB_TOKEN` cannot trigger other workflows (to prevent recursive workflows)
-- Using a PAT allows the tag creation to trigger the build workflow
-
-**Steps:**
-
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Direct link: https://github.com/settings/tokens
-
-2. Click "Generate new token" → "Generate new token (classic)"
-
-3. Configure the token:
-   - **Note**: `WAKU CI/CD Token`
-   - **Expiration**: Choose your preference (90 days, 1 year, or no expiration)
-   - **Scopes**: Select the following:
-     - ✅ `repo` (Full control of private repositories)
-       - This includes: repo:status, repo_deployment, public_repo, repo:invite, security_events
-     - ✅ `workflow` (Update GitHub Action workflows)
-
-4. Click "Generate token"
-
-5. **IMPORTANT**: Copy the token immediately (you won't be able to see it again!)
-
-### 2. Add PAT to Repository Secrets
-
-1. Go to your repository: https://github.com/YOUR_USERNAME/waku
-
-2. Click "Settings" → "Secrets and variables" → "Actions"
-
-3. Click "New repository secret"
-
-4. Add the secret:
-   - **Name**: `PAT_TOKEN`
-   - **Secret**: Paste the token you copied in step 1
-   - Click "Add secret"
-
-### 3. Verify Setup
-
-After adding the PAT_TOKEN secret, you can verify the setup:
+## How to Use
 
 1. Go to "Actions" tab in your repository
 
