@@ -92,7 +92,12 @@ func main() {
 		protected.GET("/groups/:device_id", handlers.GetGroups)
 	}
 
-	// Get port from environment
+	// Get host and port from environment
+	host := os.Getenv("HOST")
+	if host == "" {
+		host = "localhost"
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -100,14 +105,14 @@ func main() {
 
 	// Create HTTP server
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    host + ":" + port,
 		Handler: router,
 	}
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("🚀 WAKU WhatsApp API Server starting on port %s", port)
-		log.Printf("📝 API Documentation: http://localhost:%s", port)
+		log.Printf("🚀 WAKU WhatsApp API Server starting on %s:%s", host, port)
+		log.Printf("📝 API Documentation: http://%s:%s", host, port)
 		log.Printf("🔐 Authentication: Bearer token required (except /qr endpoint)")
 
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

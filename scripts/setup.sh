@@ -186,25 +186,57 @@ install_binary() {
     print_success "Binary installed to $INSTALL_DIR/$APP_NAME"
 }
 
+# Prompt for configuration
+prompt_config() {
+    print_info "Configuration Setup"
+    echo ""
+
+    # Prompt for HOST
+    read -p "Enter server host (default: localhost): " INPUT_HOST
+    HOST=${INPUT_HOST:-localhost}
+
+    # Prompt for PORT
+    read -p "Enter server port (default: 8080): " INPUT_PORT
+    PORT=${INPUT_PORT:-8080}
+
+    # Prompt for API_TOKEN
+    while true; do
+        read -p "Enter API token (press Enter to generate random): " INPUT_TOKEN
+        if [ -z "$INPUT_TOKEN" ]; then
+            # Generate random token
+            API_TOKEN=$(openssl rand -hex 16 2>/dev/null || date +%s | sha256sum | base64 | head -c 32)
+            break
+        elif [ ${#INPUT_TOKEN} -ge 8 ]; then
+            API_TOKEN="$INPUT_TOKEN"
+            break
+        else
+            print_error "API token must be at least 8 characters long"
+        fi
+    done
+
+    print_success "Configuration completed"
+}
+
 # Create .env file
 create_env_file() {
     print_info "Creating .env file..."
-    
+
     if [ -f "$INSTALL_DIR/.env" ]; then
         print_warning ".env file already exists, creating .env.example instead"
         ENV_FILE="$INSTALL_DIR/.env.example"
     else
         ENV_FILE="$INSTALL_DIR/.env"
     fi
-    
-    cat > "$ENV_FILE" << 'EOF'
+
+    cat > "$ENV_FILE" << EOF
 # WAKU WhatsApp API Configuration
 
 # API Authentication Token
-API_TOKEN=waku-secret-token-change-this-in-production
+API_TOKEN=$API_TOKEN
 
-# Server Port
-PORT=8080
+# Server Configuration
+HOST=$HOST
+PORT=$PORT
 
 # Session Storage Directory
 SESSION_DIR=/opt/waku/sessions
@@ -327,7 +359,7 @@ print_summary() {
     echo "   sudo tail -f $INSTALL_DIR/logs/waku.log"
     echo ""
     echo "5. Test API:"
-    echo "   curl http://localhost:8080/qr/test-device"
+    echo "   curl http://$HOST:$PORT/qr/test-device"
     echo ""
     echo "========================================="
 }
@@ -351,6 +383,7 @@ main() {
 
     download_binary
 
+    prompt_config
     create_user
     create_directories
     install_binary
