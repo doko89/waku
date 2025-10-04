@@ -17,13 +17,46 @@ WAKU adalah WhatsApp REST API yang dibangun menggunakan **whatsmeow** (Go librar
 
 ## 🚀 Installation
 
-### Prerequisites
+### Quick Install (Recommended)
 
-- Go 1.21 atau lebih baru
+**One-line installation from latest release:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/doko89/waku/main/scripts/setup.sh | sudo bash
+```
+
+This will:
+- ✅ Download latest binary for your platform
+- ✅ Install to `/opt/waku`
+- ✅ Create systemd service
+- ✅ Setup configuration
+- ✅ Start service automatically
+
+**After installation:**
+```bash
+# Configure API token
+sudo nano /opt/waku/.env
+
+# Restart service
+sudo systemctl restart waku
+
+# Check status
+sudo systemctl status waku
+```
+
+See [scripts/README.md](scripts/README.md) for detailed documentation.
+
+---
+
+### Manual Installation
+
+#### Prerequisites
+
+- Go 1.24 or newer
 - Git
 - Docker & Docker Compose (optional)
 
-### Option 1: Run with Go
+#### Option 1: Run with Go
 
 1. **Clone repository**
 ```bash
@@ -99,6 +132,56 @@ docker run -d \
   --name waku-api \
   ghcr.io/YOUR_USERNAME/waku:latest
 ```
+
+---
+
+## 🔄 Update & Maintenance
+
+### Update to Latest Version
+
+```bash
+# One-line update
+curl -fsSL https://raw.githubusercontent.com/doko89/waku/main/scripts/update.sh | sudo bash
+```
+
+**What happens:**
+- ✅ Checks current version
+- ✅ Downloads latest version
+- ✅ Backs up current binary
+- ✅ Updates binary
+- ✅ Restarts service
+- ✅ Auto-rollback on failure
+
+### Uninstall
+
+```bash
+# One-line uninstallation (with data backup)
+curl -fsSL https://raw.githubusercontent.com/doko89/waku/main/scripts/uninstall.sh | sudo bash
+```
+
+**Data backup:**
+Session data and logs are backed up to `/opt/waku.backup.YYYYMMDD_HHMMSS/`
+
+### Service Management
+
+```bash
+# Start service
+sudo systemctl start waku
+
+# Stop service
+sudo systemctl stop waku
+
+# Restart service
+sudo systemctl restart waku
+
+# Check status
+sudo systemctl status waku
+
+# View logs
+sudo journalctl -u waku -f
+```
+
+---
 
 ## ⚙️ Configuration
 
