@@ -255,7 +255,7 @@ func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
         </div>
 
         <div class="qr-container">
-            <div id="qrcode"></div>
+            <canvas id="qrcode"></canvas>
         </div>
 
         <div class="instructions">
@@ -282,16 +282,38 @@ func renderHTMLQRCode(c *gin.Context, deviceID, qrCode string) {
     </div>
 
     <script>
-        // Generate QR Code
-        const qrCode = '` + qrCode + `';
-        QRCode.toCanvas(document.getElementById('qrcode'), qrCode, {
-            width: 280,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#ffffff'
+        // Wait for QRCode library to load
+        function initQRCode() {
+            if (typeof QRCode === 'undefined') {
+                setTimeout(initQRCode, 100);
+                return;
             }
-        });
+
+            // Generate QR Code
+            const qrCode = '` + qrCode + `';
+            const canvas = document.getElementById('qrcode');
+
+            QRCode.toCanvas(canvas, qrCode, {
+                width: 280,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function (error) {
+                if (error) {
+                    console.error('QR Code generation error:', error);
+                    document.querySelector('.qr-container').innerHTML = '<p style="color: red;">Error generating QR code. Please refresh.</p>';
+                }
+            });
+        }
+
+        // Initialize QR code when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initQRCode);
+        } else {
+            initQRCode();
+        }
 
         // Auto refresh after 55 seconds
         setTimeout(() => {
