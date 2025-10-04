@@ -20,6 +20,11 @@ jobs:
       contents: write
     
     steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_DEPLOY_KEY }}
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -46,6 +51,8 @@ jobs:
 
       - name: Create and push tag
         run: |
+          # Konfigurasi git untuk menggunakan SSH
+          git remote set-url origin git@github.com:${{ github.repository }}.git
           git tag -a "${{ inputs.version }}" -m "${{ inputs.message }} ${{ inputs.version }}"
           git push origin "${{ inputs.version }}"
 
