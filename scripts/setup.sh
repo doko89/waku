@@ -99,32 +99,22 @@ get_latest_version() {
 # Download and extract binary
 download_binary() {
     print_info "Downloading WAKU binary..."
-    
+
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_VERSION}/${APP_NAME}-${PLATFORM}.tar.gz"
     TEMP_DIR=$(mktemp -d)
-    
+
     print_info "Download URL: $DOWNLOAD_URL"
-    
+
     if ! curl -L -o "${TEMP_DIR}/${APP_NAME}.tar.gz" "$DOWNLOAD_URL"; then
         print_error "Failed to download binary"
         rm -rf "$TEMP_DIR"
         exit 1
     fi
-    
+
     print_info "Extracting binary..."
     tar -xzf "${TEMP_DIR}/${APP_NAME}.tar.gz" -C "$TEMP_DIR"
-    
-    # Find the binary (it might have platform suffix)
-    BINARY_FILE=$(find "$TEMP_DIR" -type f -name "${APP_NAME}*" ! -name "*.tar.gz" ! -name "*.sha256" | head -1)
-    
-    if [ -z "$BINARY_FILE" ]; then
-        print_error "Binary not found in archive"
-        rm -rf "$TEMP_DIR"
-        exit 1
-    fi
-    
+
     print_success "Binary downloaded and extracted"
-    echo "$TEMP_DIR"
 }
 
 # Install dependencies
@@ -174,16 +164,25 @@ create_directories() {
 
 # Install binary
 install_binary() {
-    local TEMP_DIR=$1
-    local BINARY_FILE=$(find "$TEMP_DIR" -type f -name "${APP_NAME}*" ! -name "*.tar.gz" ! -name "*.sha256" | head -1)
-    
     print_info "Installing binary..."
-    
+
+    # Find the binary (it might have platform suffix)
+    BINARY_FILE=$(find "$TEMP_DIR" -type f -name "${APP_NAME}*" ! -name "*.tar.gz" ! -name "*.sha256" | head -1)
+
+    if [ -z "$BINARY_FILE" ]; then
+        print_error "Binary not found in extracted files"
+        ls -la "$TEMP_DIR"
+        rm -rf "$TEMP_DIR"
+        exit 1
+    fi
+
+    print_info "Found binary: $BINARY_FILE"
+
     cp "$BINARY_FILE" "$INSTALL_DIR/$APP_NAME"
     chmod +x "$INSTALL_DIR/$APP_NAME"
-    
+
     rm -rf "$TEMP_DIR"
-    
+
     print_success "Binary installed to $INSTALL_DIR/$APP_NAME"
 }
 
@@ -340,22 +339,26 @@ main() {
     echo "  WAKU WhatsApp API - Setup Script"
     echo "========================================="
     echo ""
-    
+
     check_root
     detect_platform
     get_latest_version
     install_dependencies
-    
-    TEMP_DIR=$(download_binary)
-    
+
+    # Create temp directory for download
+    TEMP_DIR=$(mktemp -d)
+    export TEMP_DIR
+
+    download_binary
+
     create_user
     create_directories
-    install_binary "$TEMP_DIR"
+    install_binary
     create_env_file
     create_systemd_service
     set_permissions
     enable_service
-    
+
     print_summary
 }
 

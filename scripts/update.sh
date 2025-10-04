@@ -129,32 +129,23 @@ check_update_needed() {
 # Download new binary
 download_binary() {
     print_info "Downloading WAKU binary..."
-    
+
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_VERSION}/${APP_NAME}-${PLATFORM}.tar.gz"
     TEMP_DIR=$(mktemp -d)
-    
+    export TEMP_DIR
+
     print_info "Download URL: $DOWNLOAD_URL"
-    
+
     if ! curl -L -o "${TEMP_DIR}/${APP_NAME}.tar.gz" "$DOWNLOAD_URL"; then
         print_error "Failed to download binary"
         rm -rf "$TEMP_DIR"
         exit 1
     fi
-    
+
     print_info "Extracting binary..."
     tar -xzf "${TEMP_DIR}/${APP_NAME}.tar.gz" -C "$TEMP_DIR"
-    
-    # Find the binary
-    BINARY_FILE=$(find "$TEMP_DIR" -type f -name "${APP_NAME}*" ! -name "*.tar.gz" ! -name "*.sha256" | head -1)
-    
-    if [ -z "$BINARY_FILE" ]; then
-        print_error "Binary not found in archive"
-        rm -rf "$TEMP_DIR"
-        exit 1
-    fi
-    
+
     print_success "Binary downloaded and extracted"
-    echo "$TEMP_DIR"
 }
 
 # Backup current binary
@@ -181,20 +172,29 @@ stop_service() {
 
 # Install new binary
 install_binary() {
-    local TEMP_DIR=$1
-    local BINARY_FILE=$(find "$TEMP_DIR" -type f -name "${APP_NAME}*" ! -name "*.tar.gz" ! -name "*.sha256" | head -1)
-    
     print_info "Installing new binary..."
-    
+
+    # Find the binary
+    BINARY_FILE=$(find "$TEMP_DIR" -type f -name "${APP_NAME}*" ! -name "*.tar.gz" ! -name "*.sha256" | head -1)
+
+    if [ -z "$BINARY_FILE" ]; then
+        print_error "Binary not found in extracted files"
+        ls -la "$TEMP_DIR"
+        rm -rf "$TEMP_DIR"
+        exit 1
+    fi
+
+    print_info "Found binary: $BINARY_FILE"
+
     cp "$BINARY_FILE" "$INSTALL_DIR/$APP_NAME"
     chmod +x "$INSTALL_DIR/$APP_NAME"
     chown waku:waku "$INSTALL_DIR/$APP_NAME"
-    
+
     # Save version
     echo "$LATEST_VERSION" > "$INSTALL_DIR/VERSION"
-    
+
     rm -rf "$TEMP_DIR"
-    
+
     print_success "New binary installed"
 }
 
@@ -285,10 +285,10 @@ main() {
     
     backup_binary
     stop_service
-    
-    TEMP_DIR=$(download_binary)
-    install_binary "$TEMP_DIR"
-    
+
+    download_binary
+    install_binary
+
     start_service
     verify_update
     clean_backups
