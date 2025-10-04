@@ -56,7 +56,80 @@ func GetWhatsAppService() *WhatsAppService {
 			waService.logger.Errorf("Failed to load existing sessions: %v", err)
 		}
 	})
+	// Start reconnect attempts after loading sessions
+		go waService.retryReconnectAllSessions()
+
 	return waService
+}
+
+// retryReconnectAllSessions attempts to reconnect all loaded sessions with retry logic
+func (s *WhatsAppService) retryReconnectAllSessions() {
+	// Wait a moment for initial connection attempts
+	time.Sleep(2 * time.Second)
+
+	s.logger.Infof("Starting retry reconnect for all sessions...")
+
+	maxRetries := 3
+	retryDelay := 5 * time.Second
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		s.logger.Infof("Retry reconnect attempt %d/%d", attempt, maxRetries)
+
+		reconnectedCount := 0
+		failedCount := 0
+
+		s.mu.RLock()
+		sessions := make([]*DeviceClient, 0, len(s.clients))
+		for _, client := range s.clients {
+			sessions = append(sessions, client)
+		}
+		s.mu.RUnlock()
+
+		for _, client := range sessions {
+			// Check if session needs reconnect (not connected but logged in)
+			if !client.Connected && client.Client.IsLoggedIn() && client.Client.Store.ID != nil {
+				s.logger.Infof("Attempting to reconnect session: %s", client.DeviceID)
+
+				if err := client.Client.Connect(); err != nil {
+					s.logger.Errorf("Failed to reconnect %s: %v", client.DeviceID, err)
+					failedCount++
+				} else {
+					// Wait for connection to establish
+					time.Sleep(2 * time.Second)
+
+					// Verify connection
+					if client.Client.IsLoggedIn() && client.Client.Store.ID != nil {
+						client.Connected = true
+						client.Phone = client.Client.Store.ID.User
+						client.ConnectedAt = time.Now()
+						s.logger.Infof("Successfully reconnected %s as %s", client.DeviceID, client.Phone)
+						reconnectedCount++
+					} else {
+						s.logger.Errorf("Session %s connected but not logged in", client.DeviceID)
+						failedCount++
+					}
+				}
+			} else if client.Connected {
+				s.logger.Infof("Session %s already connected", client.DeviceID)
+			}
+		}
+
+		s.logger.Infof("Retry attempt %d completed: %d reconnected, %d failed", attempt, reconnectedCount, failedCount)
+
+		// If all sessions are connected or no sessions need reconnect, stop retrying
+		if failedCount == 0 {
+			s.logger.Infof("All sessions successfully connected")
+			return
+		}
+
+		// Wait before next retry attempt
+		if attempt < maxRetries {
+			s.logger.Infof("Waiting %v before next retry attempt...", retryDelay)
+			time.Sleep(retryDelay)
+		}
+	}
+
+	s.logger.Errorf("Failed to reconnect some sessions after %d attempts", maxRetries)
 }
 
 // loadExistingSessions loads all existing sessions from SESSION_DIR
