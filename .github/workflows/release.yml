@@ -24,26 +24,45 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get latest tag
+      - name: Get latest tag (safe)
         id: get_tag
         run: |
           git fetch --tags
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "${{ github.event.inputs.tag_prefix }}0.0.0")
+          # Ambil hanya tag dengan format vN.N.N
+          TAG=$(git tag --list "v*" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)
+          if [ -z "$TAG" ]; then
+            TAG="v0.0.0"
+          fi
+          echo "✅ Latest tag: $TAG"
           echo "latest_tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Bump version
+      - name: Bump version safely
         id: bump
         run: |
           LATEST="${{ steps.get_tag.outputs.latest_tag }}"
-          PREFIX="${{ github.event.inputs.tag_prefix }}"
-          VERSION="${LATEST#$PREFIX}"   # hapus prefix (misal 'v')
+          PREFIX="${{ github.event.inputs.tag_prefix }}" # biasanya 'v'
+
+          # Hapus prefix v dari versi terakhir
+          VERSION="${LATEST#$PREFIX}"
+
+          # Validasi format versi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format ($VERSION), fallback ke 0.0.0"
+            VERSION="0.0.0"
+          fi
 
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
           case "${{ github.event.inputs.bump }}" in
             major) ((MAJOR++)); MINOR=0; PATCH=0 ;;
             minor) ((MINOR++)); PATCH=0 ;;
             patch) ((PATCH++)) ;;
           esac
+
+          NEW_TAG="${PREFIX}${MAJOR}.${MINOR}.${PATCH}"
+          echo "✅ New tag: $NEW_TAG"
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
 
           NEW_TAG="${PREFIX}${MAJOR}.${MINOR}.${PATCH}"
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
