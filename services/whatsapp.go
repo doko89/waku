@@ -291,7 +291,12 @@ func (dc *DeviceClient) eventHandler(evt interface{}) {
 		dc.Connected = false
 
 	case *events.Message:
-		// Handle incoming message - will be processed by webhook service
+		// Handle incoming message - send to webhook service
+		webhookSvc := GetWebhookService()
+		if webhookSvc != nil {
+			go webhookSvc.HandleIncomingMessage(dc.DeviceID, v)
+		}
+		// Also call custom event handler if set
 		if dc.EventHandler != nil {
 			dc.EventHandler(v)
 		}

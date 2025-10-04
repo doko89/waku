@@ -68,8 +68,11 @@ func GetWebhookService() *WebhookService {
 // HandleIncomingMessage processes incoming WhatsApp messages and sends to webhook
 func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Message) {
 	if !w.enabled || w.webhookURL == "" {
+		fmt.Printf("Webhook disabled or URL not set, skipping message forwarding\n")
 		return
 	}
+
+	fmt.Printf("Forwarding message from device %s to webhook: %s\n", deviceID, w.webhookURL)
 
 	// Build webhook payload
 	payload := WebhookPayload{
@@ -108,6 +111,7 @@ func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Mess
 	}
 
 	// Send to webhook with retry
+	fmt.Printf("Sending webhook payload: %+v\n", payload)
 	go w.sendWithRetry(payload)
 }
 
@@ -116,20 +120,24 @@ func (w *WebhookService) sendWithRetry(payload WebhookPayload) {
 	var lastErr error
 	
 	for attempt := 0; attempt < w.retryCount; attempt++ {
+		fmt.Printf("Webhook attempt %d/%d\n", attempt+1, w.retryCount)
 		err := w.send(payload)
 		if err == nil {
+			fmt.Printf("Webhook sent successfully on attempt %d\n", attempt+1)
 			return // Success
 		}
-		
+
 		lastErr = err
-		
+		fmt.Printf("Webhook attempt %d failed: %v\n", attempt+1, err)
+
 		// Exponential backoff
 		if attempt < w.retryCount-1 {
 			backoff := time.Duration(1<<uint(attempt)) * time.Second
+			fmt.Printf("Retrying webhook in %v\n", backoff)
 			time.Sleep(backoff)
 		}
 	}
-	
+
 	// Log final failure
 	fmt.Printf("Failed to send webhook after %d attempts: %v\n", w.retryCount, lastErr)
 }
