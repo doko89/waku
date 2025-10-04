@@ -86,11 +86,20 @@ func GetQRCode(c *gin.Context) {
 			})
 		}
 
-	case <-time.After(5 * time.Second):
-		if isBrowserRequest(c) {
-			renderHTMLError(c, "QR code not ready", "Please refresh the page to try again.")
+	case <-time.After(15 * time.Second):
+		// Check if client is generating QR code
+		if deviceClient.Client != nil && deviceClient.Client.Store.ID == nil {
+			if isBrowserRequest(c) {
+				renderHTMLError(c, "QR code generation in progress", "QR code is being generated. Please wait a moment and refresh.")
+			} else {
+				utils.ErrorResponse(c, http.StatusRequestTimeout, "QR code is being generated. Please try again in a few seconds.")
+			}
 		} else {
-			utils.ErrorResponse(c, http.StatusRequestTimeout, "QR code not ready yet. Please try again.")
+			if isBrowserRequest(c) {
+				renderHTMLError(c, "QR code not ready", "Please refresh the page to try again.")
+			} else {
+				utils.ErrorResponse(c, http.StatusRequestTimeout, "QR code not ready yet. Please try again.")
+			}
 		}
 	}
 }

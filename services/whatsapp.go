@@ -250,8 +250,19 @@ func (s *WhatsAppService) connectWithQR(dc *DeviceClient) {
 
 	for evt := range qrChan {
 		if evt.Event == "code" {
-			// Send QR code to channel
-			dc.QRChan <- evt.Code
+			// Send QR code to channel (non-blocking to avoid deadlock)
+			select {
+			case dc.QRChan <- evt.Code:
+				s.logger.Infof("QR code generated for device: %s", dc.DeviceID)
+			default:
+				// Channel is full, clear old QR codes and try again
+				select {
+				case <-dc.QRChan:
+					dc.QRChan <- evt.Code
+				default:
+					s.logger.Warnf("Failed to send QR code to channel for device: %s", dc.DeviceID)
+				}
+			}
 		} else if evt.Event == "success" {
 			s.logger.Infof("QR code scanned successfully for device: %s", dc.DeviceID)
 			break
