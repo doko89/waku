@@ -50,8 +50,130 @@ func GetWhatsAppService() *WhatsAppService {
 			clients: make(map[string]*DeviceClient),
 			logger:  waLog.Stdout("WhatsApp", "INFO", true),
 		}
+
+		// Load existing sessions from disk
+		if err := waService.loadExistingSessions(); err != nil {
+			waService.logger.Errorf("Failed to load existing sessions: %v", err)
+		}
 	})
 	return waService
+}
+
+// loadExistingSessions loads all existing sessions from SESSION_DIR
+func (s *WhatsAppService) loadExistingSessions() error {
+	sessionDir := os.Getenv("SESSION_DIR")
+	if sessionDir == "" {
+		sessionDir = "./sessions"
+	}
+
+	// Check if session directory exists
+	if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
+		s.logger.Infof("Session directory does not exist, skipping session loading")
+		return nil
+	}
+
+	// Read all directories in session directory
+	entries, err := os.ReadDir(sessionDir)
+	if err != nil {
+		return fmt.Errorf("failed to read session directory: %v", err)
+	}
+
+	loadedCount := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		deviceID := entry.Name()
+		dbPath := filepath.Join(sessionDir, deviceID, "session.db")
+
+		// Check if session database exists
+		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+			s.logger.Warnf("Session database not found for device %s, skipping", deviceID)
+			continue
+		}
+
+		// Load the session
+		if err := s.loadSession(deviceID); err != nil {
+			s.logger.Errorf("Failed to load session for device %s: %v", deviceID, err)
+			continue
+		}
+
+		loadedCount++
+		s.logger.Infof("Loaded existing session for device: %s", deviceID)
+	}
+
+	if loadedCount > 0 {
+		s.logger.Infof("Successfully loaded %d existing session(s)", loadedCount)
+	} else {
+		s.logger.Infof("No existing sessions found")
+	}
+
+	return nil
+}
+
+// loadSession loads a single session from disk
+func (s *WhatsAppService) loadSession(deviceID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Check if session already loaded
+	if _, exists := s.clients[deviceID]; exists {
+		return fmt.Errorf("session already loaded for device_id: %s", deviceID)
+	}
+
+	// Get session directory
+	sessionDir := filepath.Join(os.Getenv("SESSION_DIR"), deviceID)
+	dbPath := filepath.Join(sessionDir, "session.db")
+
+	// Create database container
+	container, err := sqlstore.New(context.Background(), "sqlite", fmt.Sprintf("file:%s?_pragma=foreign_keys(1)", dbPath), s.logger)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %v", err)
+	}
+
+	// Get first device from store
+	deviceStore, err := container.GetFirstDevice(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get device from store: %v", err)
+	}
+
+	if deviceStore == nil {
+		return fmt.Errorf("no device found in database")
+	}
+
+	// Create WhatsApp client
+	client := whatsmeow.NewClient(deviceStore, s.logger)
+
+	// Create device client
+	deviceClient := &DeviceClient{
+		Client:   client,
+		DeviceID: deviceID,
+		QRChan:   make(chan string, 5),
+	}
+
+	// Set event handler
+	client.AddEventHandler(deviceClient.eventHandler)
+
+	// Connect to WhatsApp
+	if err := client.Connect(); err != nil {
+		return fmt.Errorf("failed to connect: %v", err)
+	}
+
+	// Check if already logged in
+	if client.IsLoggedIn() {
+		deviceClient.Connected = true
+		deviceClient.Phone = client.Store.ID.User
+		deviceClient.ConnectedAt = time.Now()
+		s.logger.Infof("Device %s is already logged in as %s", deviceID, deviceClient.Phone)
+	} else {
+		s.logger.Infof("Device %s loaded but not logged in, waiting for QR scan", deviceID)
+	}
+
+	// Store client
+	s.clients[deviceID] = deviceClient
+
+	return nil
 }
 
 // CreateSession creates a new WhatsApp session for a device
