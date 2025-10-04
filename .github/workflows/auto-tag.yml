@@ -1,4 +1,4 @@
-name: Auto Tag and Build
+name: Auto Tag
 
 on:
   push:
@@ -15,11 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
-
-    outputs:
-      tag_created: ${{ steps.tag.outputs.created }}
-      new_tag: ${{ steps.tag.outputs.tag }}
 
     steps:
       - name: Checkout code
@@ -58,7 +53,7 @@ jobs:
             fi
           fi
 
-      - name: Determine next version
+      - name: Determine next version (patch + 1)
         id: version
         if: steps.changes.outputs.changes == 'true'
         run: |
@@ -76,24 +71,8 @@ jobs:
             MINOR=${VERSION_PARTS[1]}
             PATCH=${VERSION_PARTS[2]}
 
-            # Check commit messages for breaking changes or features
-            BREAKING_CHANGES=$(git log $LAST_TAG..HEAD --grep="BREAKING CHANGE:" --grep="!:" --oneline | wc -l)
-            FEATURES=$(git log $LAST_TAG..HEAD --grep="feat:" --oneline | wc -l)
-
-            if [[ $BREAKING_CHANGES -gt 0 ]]; then
-              # Breaking change, increment major
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-            elif [[ $FEATURES -gt 0 ]]; then
-              # Feature added, increment minor
-              MINOR=$((MINOR + 1))
-              PATCH=0
-            else
-              # Bug fix or other changes, increment patch
-              PATCH=$((PATCH + 1))
-            fi
-
+            # Always increment patch version (patch + 1)
+            PATCH=$((PATCH + 1))
             NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           fi
 
@@ -142,29 +121,9 @@ jobs:
             echo "- Multi-architecture binaries (Linux, Windows, macOS)" >> $GITHUB_STEP_SUMMARY
             echo "- Automatic GitHub release" >> $GITHUB_STEP_SUMMARY
             echo "- SHA256 checksums for verification" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📊 Monitor build progress at: https://github.com/${{ github.repository }}/actions"
           else
             echo "ℹ️ No new changes since last tag (${{ steps.last_tag.outputs.tag }})" >> $GITHUB_STEP_SUMMARY
             echo "🔄 No new tag created" >> $GITHUB_STEP_SUMMARY
           fi
-
-  trigger-build:
-    name: Trigger Build Workflow
-    needs: check-and-create-tag
-    runs-on: ubuntu-latest
-    if: needs.check-and-create-tag.outputs.tag_created == 'true'
-
-    steps:
-      - name: Wait for tag to be available
-        run: sleep 10
-
-      - name: Trigger build workflow
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: tag-created
-          client-payload: '{"tag": "${{ needs.check-and-create-tag.outputs.new_tag }}"}'
-
-      - name: Summary
-        run: |
-          echo "🚀 Build workflow triggered for tag ${{ needs.check-and-create-tag.outputs.new_tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "📊 Monitor progress at: https://github.com/${{ github.repository }}/actions" >> $GITHUB_STEP_SUMMARY

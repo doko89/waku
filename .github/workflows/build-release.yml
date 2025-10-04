@@ -10,8 +10,6 @@ on:
         description: 'Tag to build (e.g., v1.0.0)'
         required: true
         type: string
-  repository_dispatch:
-    types: [tag-created]
 
 env:
   GO_VERSION: '1.24'
