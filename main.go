@@ -54,8 +54,23 @@ func main() {
 	// Create Gin router
 	router := gin.Default()
 
+	// Add CORS middleware for all routes
+	router.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
 	// Public routes (no authentication required)
 	router.GET("/qr/:device_id", handlers.GetQRCode)
+	router.GET("/session/:device_id/status", handlers.GetSessionStatus) // Make status public for browser polling
 
 	// Protected routes (require authentication)
 	protected := router.Group("/")
@@ -65,7 +80,6 @@ func main() {
 		protected.POST("/session/create", handlers.CreateSession)
 		protected.POST("/logout/:device_id", handlers.LogoutSession)
 		protected.DELETE("/session/:device_id", handlers.DeleteSession)
-		protected.GET("/session/:device_id/status", handlers.GetSessionStatus)
 		protected.GET("/sessions", handlers.ListSessions)
 
 		// Messaging

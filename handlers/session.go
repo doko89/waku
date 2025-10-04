@@ -706,6 +706,7 @@ func GetSessionStatus(c *gin.Context) {
 		"device_id": deviceID,
 		"status":    status,
 		"phone":     deviceClient.Phone,
+		"connected": deviceClient.Connected, // Add connected field for browser JavaScript
 	}
 
 	if deviceClient.Connected {
