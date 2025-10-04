@@ -540,27 +540,9 @@ func renderHTMLConnected(c *gin.Context, deviceID, phone string) {
         </div>
 
         <a href="/session/` + deviceID + `/status" class="btn">📊 View Status</a>
-        <button onclick="logout()" class="btn btn-danger">🚪 Logout</button>
     </div>
 
-    <script>
-        async function logout() {
-            if (confirm('Are you sure you want to logout this session?')) {
-                try {
-                    const response = await fetch('/logout/` + deviceID + `', {
-                        method: 'POST'
-                    });
-                    if (response.ok) {
-                        alert('Logged out successfully!');
-                        location.reload();
-                    }
-                } catch (error) {
-                    alert('Error logging out: ' + error.message);
-                }
-            }
-        }
-    </script>
-</body>
+  </body>
 </html>`
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
