@@ -94,6 +94,7 @@ func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Mess
 	fmt.Printf("Message Info:\n")
 	fmt.Printf("  ID: %s\n", evt.Info.ID)
 	fmt.Printf("  Sender: %s\n", evt.Info.Sender.String())
+	fmt.Printf("  SenderAlt: %s\n", evt.Info.SenderAlt.String())
 	fmt.Printf("  Chat: %s\n", evt.Info.Chat.String())
 	fmt.Printf("  IsFromMe: %v\n", evt.Info.IsFromMe)
 	fmt.Printf("  IsGroup: %v\n", evt.Info.IsGroup)
@@ -126,10 +127,16 @@ func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Mess
 		actualSenderName = "Me"
 		fmt.Printf("Message from self - using Sender: %s\n", actualSender.String())
 	} else {
-		// This is a message from someone else - use Chat JID for incoming messages
-		actualSender = evt.Info.Chat
-		actualSenderName = evt.Info.PushName
-		fmt.Printf("Message from others - using Chat: %s, PushName: %s\n", actualSender.String(), actualSenderName)
+		// This is a message from someone else - use SenderAlt if it has a valid user
+		if evt.Info.SenderAlt.User != "" {
+			actualSender = evt.Info.SenderAlt
+			actualSenderName = evt.Info.PushName
+			fmt.Printf("Message from others - using SenderAlt: %s, PushName: %s\n", actualSender.String(), actualSenderName)
+		} else {
+			actualSender = evt.Info.Chat
+			actualSenderName = evt.Info.PushName
+			fmt.Printf("Message from others - SenderAlt empty, using Chat: %s, PushName: %s\n", actualSender.String(), actualSenderName)
+		}
 	}
 
 	// Build webhook payload
