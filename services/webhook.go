@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -82,10 +83,38 @@ func (w *WebhookService) HandleIncomingMessage(deviceID string, evt *events.Mess
 		return
 	}
 
+	fmt.Printf("========== MESSAGE EVENT DUMP ==========\n")
 	fmt.Printf("Forwarding message from device %s to webhook: %s\n", deviceID, w.webhookURL)
-	fmt.Printf("Message Info - ID: %s, Sender: %s, Chat: %s, IsFromMe: %v, IsGroup: %v\n",
-		evt.Info.ID, evt.Info.Sender.String(), evt.Info.Chat.String(), evt.Info.IsFromMe, evt.Info.IsGroup)
-	fmt.Printf("Original JID: %s, User: %s\n", evt.Info.Sender.String(), evt.Info.Sender.User)
+
+	// Dump full event info
+	eventJSON, _ := json.MarshalIndent(evt, "", "  ")
+	fmt.Printf("Full Event:\n%s\n", string(eventJSON))
+
+	// Dump specific message info fields
+	fmt.Printf("Message Info:\n")
+	fmt.Printf("  ID: %s\n", evt.Info.ID)
+	fmt.Printf("  Sender: %s\n", evt.Info.Sender.String())
+	fmt.Printf("  Chat: %s\n", evt.Info.Chat.String())
+	fmt.Printf("  IsFromMe: %v\n", evt.Info.IsFromMe)
+	fmt.Printf("  IsGroup: %v\n", evt.Info.IsGroup)
+	fmt.Printf("  PushName: %s\n", evt.Info.PushName)
+	fmt.Printf("  Timestamp: %v\n", evt.Info.Timestamp)
+
+	// Use reflection to see all fields
+	fmt.Printf("Event Type: %s\n", reflect.TypeOf(evt).String())
+
+	// Check message content directly (evt is already *events.Message)
+	fmt.Printf("Message Type: %s\n", reflect.TypeOf(evt).String())
+
+	// Check message content
+	if evt.Message.GetConversation() != "" {
+		fmt.Printf("  Conversation: %s\n", evt.Message.GetConversation())
+	}
+	if evt.Message.GetExtendedTextMessage() != nil {
+		fmt.Printf("  Extended Text: %s\n", evt.Message.GetExtendedTextMessage().GetText())
+	}
+
+	fmt.Printf("========================================\n")
 
 	// Determine the actual sender
 	var actualSender types.JID
